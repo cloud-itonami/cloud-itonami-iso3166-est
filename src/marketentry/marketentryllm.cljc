@@ -84,6 +84,8 @@
                       (when e (str " (operator=" (:operator e) ")")))
      :rationale  (if e
                    (str "signing-method=" (:signing-method e)
+                        " has-e-residency?=" (:has-e-residency? e)
+                        " ariregister-registered?=" (:ariregister-registered? e)
                         " vat-record-verified?=" (:vat-record-verified? e)
                         " claimed-fee=" (:claimed-fee e))
                    "engagementが見つかりません")
@@ -92,6 +94,7 @@
      :value      {:engagement-id subject}
      :stake      :actuation/submit-filing
      :confidence (if (and e
+                          (:ariregister-registered? e)
                           (or (not (:requires-vat-record? e))
                               (:vat-record-verified? e)))
                    0.9 0.3)}))

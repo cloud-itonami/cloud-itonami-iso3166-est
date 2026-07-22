@@ -7,4 +7,40 @@
  :itonami.blueprint/governor :market-entry-compliance-governor
  :itonami.blueprint/robotics false
  :itonami.blueprint/required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
- :itonami.blueprint/status :public-oss}
+ :itonami.blueprint/status :public-oss
+ :itonami.blueprint/maturity :implemented
+ :itonami.blueprint/implemented-slice
+ "Full Actors-pattern implementation: MarketEntry-LLM advisor
+ (marketentry.marketentryllm) sealed behind an independent Market-Entry
+ Compliance Governor (marketentry.governor, 7-check: spec-basis,
+ evidence-incomplete, e-residency-insufficient [boundary/negative check
+ -- this jurisdiction's key overstatement trap, independently verifies
+ :ariregister-registered? at :filing/submit UNCONDITIONALLY regardless
+ of the engagement's own :has-e-residency? claim, refusing to let
+ e-Residency (a digital-identity/authentication channel per
+ e-resident.gov.ee's own site, NOT a residence permit/visa/citizenship)
+ be mistaken for actual e-Business Register registration],
+ signing-method-invalid [flagship closed-set validity check on the
+ filing's own digital-signing execution instrument -- ID-card (incl.
+ e-Resident's digital ID) / Smart-ID / Mobile-ID, independently
+ confirmed on three separate RIK-family pages], engagement-fee-mismatch,
+ vat-record-unverified [EMTA/MTA VAT-liability record per
+ Käibemaksuseadus subsection 3 of section 19^1], already-drafted,
+ already-submitted) driving a langgraph-clj StateGraph
+ (marketentry.operation) over an append-only audit ledger; MemStore +
+ langchain-store-backed DatomicStore (marketentry.store, built on
+ io.github.kotoba-lang/langchain-store per ADR-2607141600, not a
+ hand-rolled enc/dec* codec); marketentry.facts grounded in a verified
+ Estonia dossier (Riigihangete seadus / Public Procurement Act, RT I,
+ 01.07.2017, 1, in force since 1 September 2017, transposing EU
+ Directives 2014/24/EU and 2014/25/EU -- Rahandusministeerium policy +
+ Riigi Tugiteenuste Keskus [RTK, vastutav töötleja since 1 January 2024]
+ operating the Riigihangete register at riigihanked.riik.ee; e-Business
+ Register [e-Äriregister, ariregister.rik.ee -- registrar: Registration
+ Department of Tartu County Court, portal operated by RIK]; Maksu- ja
+ Tolliamet [MTA/EMTA] VAT registration under the Value Added Tax Act);
+ governor contract + store parity + registry + phase + facts tests all
+ passing; 0 clj-kondo errors (clojure -M:lint); CI
+ (.github/workflows/ci.yml) reconstructs the
+ kotoba-lang/langgraph+langchain+langchain-store sibling-checkout
+ layout."}

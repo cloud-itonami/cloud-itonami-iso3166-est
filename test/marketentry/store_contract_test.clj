@@ -10,6 +10,7 @@
                                    :base-fee 100 :monthly-rate 10 :monitoring-months 1
                                    :claimed-fee 110.0
                                    :signing-method :smart-id
+                                   :has-e-residency? true :ariregister-registered? true
                                    :requires-vat-record? true :vat-record-verified? true
                                    :drafted? false :submitted? false :status :intake}})
   (store/commit-record! s {:effect :assessment/set
@@ -38,6 +39,8 @@
         d (exercise dat*)]
     (is (= (:operator (:engagement m)) (:operator (:engagement d))))
     (is (= (:signing-method (:engagement m)) (:signing-method (:engagement d))))
+    (is (= (:has-e-residency? (:engagement m)) (:has-e-residency? (:engagement d))))
+    (is (= (:ariregister-registered? (:engagement m)) (:ariregister-registered? (:engagement d))))
     (is (true? (:drafted? m)) (true? (:drafted? d)))
     (is (true? (:submitted? m)) (true? (:submitted? d)))
     (is (= 1 (count (:drafts m))) (= 1 (count (:drafts d))))

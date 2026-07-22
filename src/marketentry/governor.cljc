@@ -2,15 +2,19 @@
   "Market-Entry Compliance Governor -- the independent compliance layer
   that earns the MarketEntry-LLM the right to commit. The LLM has no
   notion of Estonian procurement law, whether a claimed engagement fee
-  actually equals base + months x rate, whether the engagement's own
-  declared digital-signing method actually belongs to the closed set
-  of Estonian e-identification methods {ID-card (incl. e-Resident's
-  digital ID), Smart-ID, Mobile-ID} RIK's own portal pages require, or
-  whether a Value Added Tax Act (Käibemaksuseadus) VAT-liability record
-  has been verified for a filing that requires it, or when a draft
-  stops being a draft and becomes a real-world riigihanked.riik.ee
-  submission, so this MUST be a separate system able to *reject* a
-  proposal and fall back to HOLD.
+  actually equals base + months x rate, whether an engagement's
+  `:has-e-residency? true` has been mistaken for actual
+  `:ariregister-registered?` company registration (e-Residency is an
+  authentication CHANNEL, never itself sufficient -- this
+  jurisdiction's best-known overstatement trap), whether the
+  engagement's own declared digital-signing method actually belongs to
+  the closed set of Estonian e-identification methods {ID-card (incl.
+  e-Resident's digital ID), Smart-ID, Mobile-ID} RIK's own portal pages
+  require, or whether a Value Added Tax Act (Käibemaksuseadus)
+  VAT-liability record has been verified for a filing that requires
+  it, or when a draft stops being a draft and becomes a real-world
+  riigihanked.riik.ee submission, so this MUST be a separate system
+  able to *reject* a proposal and fall back to HOLD.
 
   `:itonami.blueprint/governor` is `:market-entry-compliance-governor`
   (shared family keyword on blueprints).
@@ -21,7 +25,7 @@
   human sign-off'; 'a false or fabricated regulatory-requirement claim
   is a HARD hold') names exactly the checks below.
 
-  Six checks, in priority order, ALL HARD violations: a human
+  Seven checks, in priority order, ALL HARD violations: a human
   approver CANNOT override them. The confidence/actuation gate is
   SOFT: it asks a human to look (low confidence / actuation), and the
   human may approve -- but see `marketentry.phase`: for `:stake
@@ -38,7 +42,36 @@
                                        jurisdiction actually been
                                        assessed with a full evidence
                                        checklist on file?
-    3. Signing-method invalid      -- for `:filing/submit`,
+    3. e-Residency insufficient    -- for `:filing/submit`,
+                                       INDEPENDENTLY verify the
+                                       engagement's own
+                                       `:ariregister-registered?`
+                                       ground truth is true --
+                                       UNCONDITIONALLY, regardless of
+                                       whether the engagement also
+                                       declares `:has-e-residency?
+                                       true`. This jurisdiction's
+                                       best-known overstatement trap:
+                                       e-Residency is a digital-
+                                       identity/authentication CHANNEL
+                                       (one of the closed-set signing
+                                       methods check 4 validates), NOT
+                                       a residence permit, visa, or
+                                       citizenship, and does NOT by
+                                       itself satisfy Estonia's
+                                       business-registration
+                                       substantive requirements (a
+                                       licensed legal-address/contact-
+                                       person service is typically
+                                       still required). A boundary/
+                                       negative check, the SAME
+                                       'don't-let-the-advisor-
+                                       overclaim' discipline check 1
+                                       (spec-basis) applies, aimed
+                                       specifically at this trap -- see
+                                       `marketentry.facts`'s e-Residency
+                                       scope note.
+    4. Signing-method invalid      -- for `:filing/submit`,
                                        INDEPENDENTLY recompute whether
                                        the engagement's own declared
                                        `:signing-method` actually
@@ -73,7 +106,7 @@
                                        filing's own execution rather
                                        than on the bidder's business
                                        substance.
-    4. Engagement fee mismatch     -- for `:filing/submit`,
+    5. Engagement fee mismatch     -- for `:filing/submit`,
                                        INDEPENDENTLY recompute whether
                                        the engagement's own `:claimed-
                                        fee` equals `base-fee +
@@ -81,7 +114,7 @@
                                        months` -- honest reapplication
                                        of the ground-truth-recompute
                                        discipline sibling actors use.
-    5. VAT record unverified        -- for `:filing/submit`, when the
+    6. VAT record unverified        -- for `:filing/submit`, when the
                                        engagement declares
                                        `:requires-vat-record? true`,
                                        INDEPENDENTLY check
@@ -94,7 +127,7 @@
                                        Added Tax Act subsection 3 of
                                        section 19^1 (see
                                        `marketentry.facts`).
-    6. Confidence floor / actuation
+    7. Confidence floor / actuation
        gate                          -- LLM confidence below threshold,
                                        OR the op is `:filing/draft`/
                                        `:filing/submit` (REAL acts)
@@ -142,6 +175,34 @@
                       (:jurisdiction e) (:checklist assessment)))
         [{:rule :evidence-incomplete
           :detail "法域の必要書類(e-Business Register登録/EMTA VAT記録/RHR登録確認/署名方式確認/代理人確認等)が充足していない状態での提案"}]))))
+
+(defn- e-residency-insufficient-violations
+  "Boundary/negative check -- this jurisdiction's best-known
+  overstatement trap. e-Residency (e-residentsus) is a digital-
+  identity/authentication CHANNEL: it enables remote e-Business-
+  Register formation via one of the recognised digital-signing
+  methods (see `signing-method-invalid-violations`), but it is NOT a
+  residence permit, visa, or citizenship, and it does NOT by itself
+  satisfy Estonia's business-registration substantive requirements (a
+  licensed legal-address/contact-person service in Estonia is
+  typically still required; e-Residency confers no right to
+  physically live or work in Estonia/the EU). For `:filing/submit`,
+  INDEPENDENTLY verify the engagement's own `:ariregister-registered?`
+  ground truth is true -- UNCONDITIONALLY, regardless of whether the
+  engagement also declares `:has-e-residency? true`. This refuses to
+  let e-Residency POSSESSION be mistaken for actual e-Business
+  Register REGISTRATION -- the SAME 'don't-let-the-advisor-overclaim'
+  discipline `spec-basis-violations` applies, aimed specifically at
+  this trap (see `marketentry.facts`'s e-Residency scope note)."
+  [{:keys [op subject]} st]
+  (when (= op :filing/submit)
+    (let [e (store/engagement st subject)]
+      (when-not (true? (:ariregister-registered? e))
+        [{:rule :e-residency-insufficient
+          :detail (str subject " (has-e-residency?=" (:has-e-residency? e)
+                      ") -- e-Residencyの保有(認証チャネル)のみでは事業登記要件を満たさない。"
+                      "e-Äriregisterへの実登記(:ariregister-registered?)が独立確認されるまで"
+                      "提出提案は進められない")}]))))
 
 (defn- signing-method-invalid-violations
   "For `:filing/submit`, INDEPENDENTLY recompute whether the
@@ -208,6 +269,7 @@
   (let [hard (into []
                    (concat (spec-basis-violations request proposal)
                            (evidence-incomplete-violations request st)
+                           (e-residency-insufficient-violations request st)
                            (signing-method-invalid-violations request st)
                            (engagement-fee-mismatch-violations request st)
                            (vat-record-unverified-violations request st)

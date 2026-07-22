@@ -243,7 +243,32 @@
 
   Coverage is reported HONESTLY (see `coverage`): a jurisdiction not in
   this table has NO spec-basis, full stop -- the advisor must not
-  fabricate one, and the governor holds if it tries.")
+  fabricate one, and the governor holds if it tries.
+
+  **e-Residency scope note (this jurisdiction's best-known
+  overstatement trap, guarded by `marketentry.governor`'s
+  `e-residency-insufficient-violations`)**: e-Residency
+  (e-residentsus, `e-resident.gov.ee`) is a digital-identity /
+  authentication TOOL, NOT a residence permit, visa, or citizenship.
+  It ENABLES remote e-Business-Register company formation (digital
+  signing via the e-Resident's digital ID card, Smart-ID, or
+  Mobile-ID -- see `signing-method-spec-basis` above, independently
+  confirmed on three RIK-family pages) but does NOT by itself satisfy
+  Estonia's substantive business-registration requirements, and
+  confers NO right to physically live or work in Estonia/the EU. A
+  company formed via e-Residency typically still needs a licensed
+  legal-address/contact-person service in Estonia (a separate,
+  ongoing third-party engagement, not something e-Residency itself
+  provides). This catalog and the governor model e-Residency strictly
+  as an AUTHENTICATION-CHANNEL facilitator (one of the closed-set
+  digital-signing methods in `:signing-method-valid-set`) -- never as
+  itself satisfying business-registration substantive requirements or
+  residency/citizenship. `marketentry.governor/e-residency-insufficient-violations`
+  INDEPENDENTLY verifies an engagement's own `:ariregister-registered?`
+  ground truth at `:filing/submit`, UNCONDITIONALLY (regardless of
+  whether the engagement also declares `:has-e-residency? true`) --
+  the fleet's own 'don't-let-the-advisor-overclaim' discipline
+  (`spec-basis-violations`) applied to this specific trap.")
 
 (def catalog
   "iso3 -> requirement map. `:required-evidence` mirrors the generic

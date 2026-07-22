@@ -79,6 +79,19 @@
       (is (some #{:signing-method-invalid} (-> (store/ledger db) last :basis)))
       (is (empty? (store/submit-history db))))))
 
+(deftest e-residency-insufficient-is-held-and-unoverridable
+  (testing "e-Residency (has-e-residency?) held to NOT be sufficient for actual Äriregister registration -> HARD hold (boundary check, this jurisdiction's key trap)"
+    (let [[db actor] (fresh)
+          _ (assess! actor "t5bpre" "eng-6")
+          _ (draft! actor "t5bpre" "eng-6")
+          res (exec-op actor "t5b" {:op :filing/submit :subject "eng-6"} operator)]
+      (is (true? (:has-e-residency? (store/engagement db "eng-6"))) "engagement genuinely has e-Residency")
+      (is (false? (:ariregister-registered? (store/engagement db "eng-6"))) "but is NOT actually registered")
+      (is (= :hold (get-in res [:state :disposition])) "settles immediately, no interrupt")
+      (is (not= :interrupted (:status res)))
+      (is (some #{:e-residency-insufficient} (-> (store/ledger db) last :basis)))
+      (is (empty? (store/submit-history db))))))
+
 (deftest engagement-fee-mismatch-is-held
   (testing "claimed fee that doesn't equal base + months x rate -> HOLD"
     (let [[db actor] (fresh)
