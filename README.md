@@ -72,6 +72,52 @@ See [`docs/business-model.md`](docs/business-model.md) and
 
 AGPL-3.0-or-later.
 
+## Market-entry / statute catalogs
+
+Governed public-sector market-entry compliance actor, same architecture
+as the other `cloud-itonami-iso3166-*` siblings:
+
+- `src/marketentry/{facts,governor,phase,sim,operation,registry,store,
+  marketentryllm}.cljc` -- the actor. `facts.cljc` cites the Public
+  Procurement Act (Riigihangete seadus, current consolidated version
+  per the Ministry of Finance's own citation), the Riigihangete
+  register (RHR, riigihanked.riik.ee -- vastutav töötleja/responsible
+  processor: Riigi Tugiteenuste Keskus as of 1 January 2024, per RTK's
+  own dated announcement, transferred from the Ministry of Finance),
+  the e-Business Register (e-Äriregister, ariregister.rik.ee --
+  registrar: Registration Department of Tartu County Court; portal
+  developed and managed by RIK), and the Estonian Tax and Customs
+  Board (EMTA) VAT-liability registration threshold (EUR 40,000
+  annual turnover, Value Added Tax Act subsection 3 of section 19^1).
+  `governor.cljc`'s flagship check independently recomputes whether
+  the engagement's own declared digital-signing method belongs to
+  Estonia's closed set of nationally-recognised e-identification
+  methods {ID-card (incl. e-Resident's digital ID), Smart-ID,
+  Mobile-ID} -- a check SHAPE genuinely different from every other
+  iso3166 sibling's (a procedural/instrumental validity axis on the
+  filing's own execution, not a business-substance eligibility test;
+  see the namespace docstrings for the full research trail and
+  honestly-narrowed scope, including facts this iteration could NOT
+  verify, such as an exclusion-grounds article citation and a
+  same-day -- vs. the officially-documented 1-2 day -- registration
+  claim).
+- `src/statute/facts.cljc` -- general-law catalog: the Äriseadustik
+  (Commercial Code, cited via RIK's own portal page linking to the
+  Riigi Teataja consolidated text) and the Töölepingu seadus
+  (Employment Contracts Act, cited via the Labour Inspectorate's own
+  official portal, in force since 1 July 2009).
+
+Every citation is curl/WebFetch-verified against an official source
+(fin.ee, rtk.ee, riigihanked.riik.ee, ariregister.rik.ee, abiinfo.rik.ee,
+rik.ee, emta.ee, ria.ee, tooelu.ee); Riigi Teataja itself
+(riigiteataja.ee) turned out to be an Angular SPA behind Cloudflare
+unreachable by curl/WebFetch/Googlebot-UA in this session, so citations
+to it are anchored via other official government bodies' own direct
+links/quotes rather than a directly-rendered Riigi Teataja page -- see
+`marketentry.facts`'s and `statute.facts`'s docstrings for exactly
+which facts are HIGH-confidence (quoted directly) vs. an
+honestly-flagged gap.
+
 ## Culture catalog
 
 Alongside the market-entry / statute catalogs, this repo carries a
