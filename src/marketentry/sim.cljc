@@ -65,6 +65,14 @@
     (println "== filing/submit eng-5 (vat-record-unverified -> HARD hold) ==")
     (println (exec-op actor "t11" {:op :filing/submit :subject "eng-5"} operator))
 
+    (println "== jurisdiction/assess eng-6 (sets up e-residency-insufficient) ==")
+    (println (exec-op actor "t14" {:op :jurisdiction/assess :subject "eng-6"} operator))
+    (println (approve! actor "t14"))
+    (println (exec-op actor "t14b" {:op :filing/draft :subject "eng-6"} operator))
+    (println (approve! actor "t14b"))
+    (println "== filing/submit eng-6 (has-e-residency? but NOT ariregister-registered? -> HARD hold) ==")
+    (println (exec-op actor "t15" {:op :filing/submit :subject "eng-6"} operator))
+
     (println "== filing/draft eng-1 AGAIN (double-draft -> HARD hold) ==")
     (println (exec-op actor "t12" {:op :filing/draft :subject "eng-1"} operator))
 

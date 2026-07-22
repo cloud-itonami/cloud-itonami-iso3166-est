@@ -18,10 +18,9 @@
   `:status` value).
 
   The ledger stays append-only on every backend."
-  (:require #?(:clj  [clojure.edn :as edn]
-               :cljs [cljs.reader :as edn])
-            [marketentry.registry :as registry]
-            [langchain.db :as d]))
+  (:require [marketentry.registry :as registry]
+            [langchain.db :as d]
+            [langchain-store.core :as ls]))
 
 (defprotocol Store
   (engagement [s id])
@@ -48,13 +47,19 @@
   e-identification methods, per `marketentry.registry/valid-signing-
   methods`); `:requires-vat-record?` / `:vat-record-verified?` are
   ground truth for the conditional EMTA (Estonian Tax and Customs
-  Board) VAT-liability record check."
+  Board) VAT-liability record check; `:has-e-residency?` /
+  `:ariregister-registered?` are ground truth for the
+  `e-residency-insufficient` boundary check (e-Residency POSSESSION,
+  an authentication channel, is never by itself
+  e-Business-Register REGISTRATION -- eng-6 is the one engagement
+  that has e-Residency but is NOT yet actually registered)."
   []
   {:engagements
    {"eng-1" {:id "eng-1" :operator "Tallinna Tehnika OÜ" :portal "riigihanked.riik.ee"
              :base-fee 500000 :monthly-rate 30000 :monitoring-months 12
              :claimed-fee 860000.0
              :signing-method :id-card
+             :has-e-residency? true :ariregister-registered? true
              :requires-vat-record? true :vat-record-verified? true
              :drafted? false :submitted? false
              :jurisdiction "EST" :status :intake}
@@ -62,6 +67,7 @@
              :base-fee 500000 :monthly-rate 30000 :monitoring-months 12
              :claimed-fee 860000.0
              :signing-method :id-card
+             :has-e-residency? false :ariregister-registered? true
              :requires-vat-record? true :vat-record-verified? true
              :drafted? false :submitted? false
              :jurisdiction "ATL" :status :intake}
@@ -69,6 +75,7 @@
              :base-fee 500000 :monthly-rate 30000 :monitoring-months 12
              :claimed-fee 999000.0
              :signing-method :smart-id
+             :has-e-residency? false :ariregister-registered? true
              :requires-vat-record? true :vat-record-verified? true
              :drafted? false :submitted? false
              :jurisdiction "EST" :status :intake}
@@ -76,6 +83,7 @@
              :base-fee 500000 :monthly-rate 30000 :monitoring-months 12
              :claimed-fee 860000.0
              :signing-method :wet-signature
+             :has-e-residency? false :ariregister-registered? true
              :requires-vat-record? true :vat-record-verified? true
              :drafted? false :submitted? false
              :jurisdiction "EST" :status :intake}
@@ -83,7 +91,16 @@
              :base-fee 500000 :monthly-rate 30000 :monitoring-months 12
              :claimed-fee 860000.0
              :signing-method :mobile-id
+             :has-e-residency? false :ariregister-registered? true
              :requires-vat-record? true :vat-record-verified? false
+             :drafted? false :submitted? false
+             :jurisdiction "EST" :status :intake}
+    "eng-6" {:id "eng-6" :operator "Digital Nomad Consulting OÜ" :portal "riigihanked.riik.ee"
+             :base-fee 500000 :monthly-rate 30000 :monitoring-months 12
+             :claimed-fee 860000.0
+             :signing-method :e-resident-card
+             :has-e-residency? true :ariregister-registered? false
+             :requires-vat-record? true :vat-record-verified? true
              :drafted? false :submitted? false
              :jurisdiction "EST" :status :intake}}})
 
@@ -174,11 +191,9 @@
    :draft-sequence/jurisdiction     {:db/unique :db.unique/identity}
    :submit-sequence/jurisdiction    {:db/unique :db.unique/identity}})
 
-(defn- enc [v] (pr-str v))
-(defn- dec* [s] (when s (edn/read-string s)))
-
 (defn- engagement->tx [{:keys [id operator portal base-fee monthly-rate monitoring-months claimed-fee
                                signing-method
+                               has-e-residency? ariregister-registered?
                                requires-vat-record? vat-record-verified?
                                drafted? submitted?
                                jurisdiction status draft-number submit-number]}]
@@ -190,6 +205,8 @@
     monitoring-months                     (assoc :engagement/monitoring-months monitoring-months)
     claimed-fee                           (assoc :engagement/claimed-fee claimed-fee)
     signing-method                        (assoc :engagement/signing-method signing-method)
+    (some? has-e-residency?)              (assoc :engagement/has-e-residency? has-e-residency?)
+    (some? ariregister-registered?)       (assoc :engagement/ariregister-registered? ariregister-registered?)
     (some? requires-vat-record?)          (assoc :engagement/requires-vat-record? requires-vat-record?)
     (some? vat-record-verified?)          (assoc :engagement/vat-record-verified? vat-record-verified?)
     (some? drafted?)                      (assoc :engagement/drafted? drafted?)
@@ -203,6 +220,7 @@
   [:engagement/id :engagement/operator :engagement/portal :engagement/base-fee :engagement/monthly-rate
    :engagement/monitoring-months :engagement/claimed-fee
    :engagement/signing-method
+   :engagement/has-e-residency? :engagement/ariregister-registered?
    :engagement/requires-vat-record? :engagement/vat-record-verified?
    :engagement/drafted? :engagement/submitted?
    :engagement/jurisdiction :engagement/status :engagement/draft-number :engagement/submit-number])
@@ -213,6 +231,8 @@
      :base-fee (:engagement/base-fee m) :monthly-rate (:engagement/monthly-rate m)
      :monitoring-months (:engagement/monitoring-months m) :claimed-fee (:engagement/claimed-fee m)
      :signing-method (:engagement/signing-method m)
+     :has-e-residency? (boolean (:engagement/has-e-residency? m))
+     :ariregister-registered? (boolean (:engagement/ariregister-registered? m))
      :requires-vat-record? (boolean (:engagement/requires-vat-record? m))
      :vat-record-verified? (boolean (:engagement/vat-record-verified? m))
      :drafted? (boolean (:engagement/drafted? m)) :submitted? (boolean (:engagement/submitted? m))
@@ -228,21 +248,12 @@
          (map #(pull->engagement (d/pull (d/db conn) engagement-pull [:engagement/id %])))
          (sort-by :id)))
   (assessment-of [_ engagement-id]
-    (dec* (d/q '[:find ?p . :in $ ?eid
-                :where [?a :assessment/engagement-id ?eid] [?a :assessment/payload ?p]]
-              (d/db conn) engagement-id)))
-  (ledger [_]
-    (->> (d/q '[:find ?s ?f :where [?e :ledger/seq ?s] [?e :ledger/fact ?f]] (d/db conn))
-         (sort-by first)
-         (mapv (comp dec* second))))
-  (draft-history [_]
-    (->> (d/q '[:find ?s ?r :where [?e :draft-record/seq ?s] [?e :draft-record/record ?r]] (d/db conn))
-         (sort-by first)
-         (mapv (comp dec* second))))
-  (submit-history [_]
-    (->> (d/q '[:find ?s ?r :where [?e :submit-record/seq ?s] [?e :submit-record/record ?r]] (d/db conn))
-         (sort-by first)
-         (mapv (comp dec* second))))
+    (ls/dec* (d/q '[:find ?p . :in $ ?eid
+                   :where [?a :assessment/engagement-id ?eid] [?a :assessment/payload ?p]]
+                 (d/db conn) engagement-id)))
+  (ledger [_] (ls/read-stream conn :ledger/seq :ledger/fact))
+  (draft-history [_] (ls/read-stream conn :draft-record/seq :draft-record/record))
+  (submit-history [_] (ls/read-stream conn :submit-record/seq :submit-record/record))
   (next-draft-sequence [_ jurisdiction]
     (or (d/q '[:find ?n . :in $ ?j
               :where [?e :draft-sequence/jurisdiction ?j] [?e :draft-sequence/next ?n]]
@@ -263,7 +274,7 @@
       (d/transact! conn [(engagement->tx value)])
 
       :assessment/set
-      (d/transact! conn [{:assessment/engagement-id (first path) :assessment/payload (enc payload)}])
+      (d/transact! conn [{:assessment/engagement-id (first path) :assessment/payload (ls/enc payload)}])
 
       :engagement/mark-drafted
       (let [engagement-id (first path)
@@ -273,7 +284,7 @@
         (d/transact! conn
                      [(engagement->tx (assoc engagement-patch :id engagement-id))
                       {:draft-sequence/jurisdiction jurisdiction :draft-sequence/next next-n}
-                      {:draft-record/seq (count (draft-history s)) :draft-record/record (enc (get result "record"))}])
+                      {:draft-record/seq (count (draft-history s)) :draft-record/record (ls/enc (get result "record"))}])
         result)
 
       :engagement/mark-submitted
@@ -284,12 +295,12 @@
         (d/transact! conn
                      [(engagement->tx (assoc engagement-patch :id engagement-id))
                       {:submit-sequence/jurisdiction jurisdiction :submit-sequence/next next-n}
-                      {:submit-record/seq (count (submit-history s)) :submit-record/record (enc (get result "record"))}])
+                      {:submit-record/seq (count (submit-history s)) :submit-record/record (ls/enc (get result "record"))}])
         result)
       nil)
     s)
   (append-ledger! [s fact]
-    (d/transact! conn [{:ledger/seq (count (ledger s)) :ledger/fact (enc fact)}])
+    (ls/append-blob! conn :ledger/seq :ledger/fact (count (ledger s)) fact)
     fact)
   (with-engagements [s engagements]
     (when (seq engagements) (d/transact! conn (mapv engagement->tx (vals engagements)))) s))
